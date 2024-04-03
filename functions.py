@@ -6,11 +6,11 @@ from lxml import etree
 import threading
 from settings import UA, HOST, BASE_DIR
 
-
+# 检查URL是否已经被访问过
 def is_url_visited(url, visited_urls):
     return url in visited_urls
 
-
+# 获取网页内容
 def get_page(url):
     req = Request(url)
     req.add_header('User-Agent', random.choice(UA))
@@ -22,9 +22,8 @@ def get_page(url):
         print(f"获取页面时出错: {e}")
         return "error"
 
-
+# 爬取具体内容页面
 def crawl_source_page(url, filedir, filename, visited_urls):
-    # print(url) book_content_url
     page = get_page(url)
     if page == "error":
         return
@@ -38,13 +37,12 @@ def crawl_source_page(url, filedir, filename, visited_urls):
         for node in nodes:
             source_url = node.xpath("@href")[0]
             source_text = node.xpath("text()")[0]
-            # print(f"Sourceurl: {url}{source_url}")
 
             if re.search("html$", source_url):
                 f.write(f"{source_text}: {url}{source_url}\n")
     print(f"{source_file_path} 内容写入完毕!")
 
-
+# 爬取列表页面
 def crawl_list_page(index_url, filedir, visited_urls):
     print(f"处理类别页面: {index_url}")
     print("------------------------------\n")
@@ -74,7 +72,7 @@ def crawl_list_page(index_url, filedir, visited_urls):
                 print(f"进一步嵌套以进行分页: {page_url}")
                 crawl_list_page(page_url, filedir, visited_urls)
 
-
+# 爬取主页
 def crawl_index_page(start_url):
     print("抓取主页...")
     page = get_page(start_url)
@@ -86,7 +84,6 @@ def crawl_index_page(start_url):
 
     for node in nodes:
         url = node.xpath("@href")[0]
-        # print(f"url: {url}")
 
         if re.match(r'^/[^/]*/$', url):
             if is_url_visited(url, visited_urls):
@@ -102,7 +99,7 @@ def crawl_index_page(start_url):
                 thread = MyThread(HOST + url, new_dir, visited_urls)
                 thread.start()
 
-
+# 自定义线程类
 class MyThread(threading.Thread):
     def __init__(self, url, new_dir, visited_urls):
         threading.Thread.__init__(self)
