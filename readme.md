@@ -9,6 +9,6 @@
 
 ## 如何使用：
 
-1.修改settings.py中的BASE_DIR为本地目录中的book文件夹地址
-2.运行main.py文件
-3.爬取到的数据在1设置的目录中
+1. 修改settings.py中的BASE_DIR为本地目录中的book文件夹地址
+2. 运行main.py文件
+3. 爬取到的数据在1设置的目录中
