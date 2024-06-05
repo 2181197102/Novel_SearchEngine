@@ -6,6 +6,10 @@
 
 
 
+## 作者信息
+
+
+
 
 
 ## 项目整体架构设计
@@ -19,10 +23,12 @@ Book_SearchEngine/
 ├── functions.py           # 爬虫核心功能模块
 ├── import_files.py        # 数据导入模块
 ├── indexer.py             # 索引构建模块
-├── craw_main.py           # 程序入口
+├── craw_main.py           # 爬虫入口程序
 ├── models.py              # 数据库模型
+├── search.py              # 搜索和推荐模块
 ├── settings.py            # 配置文件
 └── README.md              # 项目说明
+
 ```
 
 #### 2. 模块功能概述
@@ -460,7 +466,7 @@ db.create_tables([NovelChapter])
 **import_files.py**：
 
 ```py
-python复制代码import os
+import os
 import chardet
 from models import NovelChapter
 
@@ -536,3 +542,392 @@ if __name__ == "__main__":
 
 
 
+## 三、索引构建设计
+
+> 在自然语言处理和全文检索的过程中，中文分词是一个重要的步骤。中文文本不像英文有明显的单词分隔符（如空格），因此需要分词工具将连续的汉字序列切分成有意义的词语。分词的准确性直接影响到后续的文本分析和检索效果。
+>
+> 以下是使用自定义词典的几个主要原因：
+>
+> #### 1. 提高分词准确性
+>
+> 通用分词器如 `jieba` 自带的词典覆盖了常见的中文词汇和短语，但在特定领域或特定应用场景下，通用词典可能不足以处理所有专业术语或特定命名实体。例如，在小说网站爬虫项目中，小说的作者名字、特定的书名、人物名等往往不是通用词典所能覆盖的。
+>
+> 通过加载自定义词典，可以确保这些特定词语在分词过程中被正确识别和处理，提高分词的准确性。例如，作者的名字作为小说数据的重要组成部分，如果不能被正确识别，将导致索引和检索的效果大打折扣。
+>
+> #### 2. 处理命名实体
+>
+> 命名实体（如人名、地名、机构名等）在文本处理中占有重要地位。很多命名实体并不在通用词典中，但在特定应用中却非常关键。通过自定义词典，可以添加这些命名实体，确保分词器能够正确识别和处理它们。例如，在小说文本中，主角、配角的名字，以及特定地点、组织的名称，如果没有被正确识别，可能会影响到小说内容的理解和检索效果。
+>
+> #### 3. 提高检索效果
+>
+> 准确的分词能够极大地提高全文检索的效果。检索系统依赖于倒排索引，倒排索引的构建过程需要将文档切分为词条，并为每个词条建立索引。如果分词不准确，将导致索引的不准确，进而影响到检索的相关性和召回率。通过自定义词典，可以确保特定领域的重要词汇被正确处理，从而提高检索系统的整体效果。
+>
+> #### 4. 灵活适应不同应用场景
+>
+> 不同的应用场景有不同的专业术语和特定词汇。通过自定义词典，分词器可以灵活适应不同的应用需求。例如，在本次实验中，针对小说数据中的特定词汇（如作者名），我们生成了自定义词典，使得分词器能够正确识别和处理这些词汇，确保索引和检索的准确性。
+>
+> 
+>
+> 
+>
+> **自定义词典文件中的每一行通常包含以下信息：**
+>
+> ```
+> 词汇 词频 词性
+> ```
+>
+> #### 1. 词汇
+>
+> 这是你希望分词器能够识别并正确处理的特定词语。例如，作者名字、特定专业术语、组织名称等。在本次实验中，词汇主要是小说作者的名字。
+>
+> #### 2. 词频
+>
+> 词频（frequency）是一个整数值，表示该词汇在文本中的出现频率。词频值越高，该词汇被识别为一个独立词语的优先级越高。通常，你可以给所有自定义词汇赋予一个较高的词频值（如1000），以确保这些词汇在分词过程中被正确识别。
+>
+> #### 3. 词性
+>
+> 词性（part-of-speech tagging）是一个简写标签，表示该词汇在句子中的语法角色。常见的词性标签包括：
+>
+> - `n`：名词
+> - `nr`：人名
+> - `ns`：地名
+> - `nt`：机构团体
+> - `nz`：其他专名
+> - `v`：动词
+> - `a`：形容词
+> - `d`：副词
+
+##### 1.1 索引构建流程
+
+索引构建的主要流程如下：
+
+1. **生成自定义词典**：从 `.txt` 文件的文件名中提取作者名字，生成自定义词典文件。
+2. **加载自定义词典**：通过 jieba 加载自定义词典。
+3. **定义索引 Schema**：指定需要索引的字段，包括小说类型、名称、章节号、章节名和章节 URL。
+4. **创建或打开索引目录**：如果索引目录不存在，则创建新目录；否则，打开已有索引目录。
+5. **从数据库中读取数据**：读取 NovelChapter 表中的所有章节数据。
+6. **构建索引**：使用 Whoosh 的 writer 对象将数据逐条写入索引。
+7. **提交索引**：将写入的索引数据提交保存。
+
+##### 1.2 索引构建模块代码
+
+以下是更新后的索引构建模块代码：
+
+```py
+import jieba
+from whoosh.index import create_in, open_dir
+from whoosh.fields import Schema, TEXT, ID
+from jieba.analyse import ChineseAnalyzer
+import os
+from models import NovelChapter
+
+# 使用 jieba 分词器进行中文分词
+analyzer = ChineseAnalyzer()
+
+# 生成自定义词典文件
+def generate_custom_dict(directory):
+    authors = set()
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.txt'):
+                # 从文件名中提取作者名字
+                novel_info = os.path.splitext(file)[0].split('_')
+                if len(novel_info) == 2:
+                    author = novel_info[1]
+                    authors.add(author)
+    # 写入自定义词典文件
+    with open('custom_dict.txt', 'w', encoding='utf-8') as f:
+        for author in authors:
+            f.write(f"{author} 1000 nr\n")
+
+# 加载自定义词典
+def load_custom_dict():
+    jieba.load_userdict('custom_dict.txt')
+
+# 定义索引的 Schema，包含小说类型、名称、章节号、章节名、作者和URL字段
+schema = Schema(
+    novel_type=TEXT(stored=True, analyzer=analyzer),
+    novel_name=TEXT(stored=True, analyzer=analyzer),
+    novel_author=TEXT(stored=True, analyzer=analyzer),
+    novel_chapter_num=TEXT(stored=True, analyzer=analyzer),
+    novel_chapter_name=TEXT(stored=True, analyzer=analyzer),
+    novel_chapter_url=ID(stored=True, unique=True)
+)
+
+# 创建索引目录
+index_dir = "indexdir"
+if not os.path.exists(index_dir):
+    os.mkdir(index_dir)
+    ix = create_in(index_dir, schema)
+else:
+    ix = open_dir(index_dir)
+
+# 构建索引的函数
+def build_index():
+    writer = ix.writer()
+    total_chapters = NovelChapter.select().count()
+    print(f"总章节数: {total_chapters}")
+    processed = 0
+    for chapter in NovelChapter.select():
+        try:
+            writer.add_document(
+                novel_type=chapter.novel_type,
+                novel_name=chapter.novel_name,
+                novel_author=chapter.novel_author,
+                novel_chapter_num=chapter.novel_chapter_num,
+                novel_chapter_name=chapter.novel_chapter_name,
+                novel_chapter_url=chapter.novel_chapter_url
+            )
+            processed += 1
+            if processed % 100 == 0:
+                print(f"已处理章节数: {processed}/{total_chapters}")
+        except Exception as e:
+            print(f"索引时出错: {chapter.novel_name} - {chapter.novel_chapter_num} {chapter.novel_chapter_name} - {e}")
+    writer.commit()
+
+if __name__ == "__main__":
+    # 使用实际的小说文件目录生成自定义词典
+    generate_custom_dict('D:\\course\\Distributed_crawler\\crawl_book - turn_pages\\book_with_author')
+    load_custom_dict()  # 加载自定义词典
+    build_index()  # 构建索引
+    print("索引构建完成")
+
+```
+
+##### 1.3 代码详解
+
+1. **生成自定义词典 (`generate_custom_dict` 函数)**： 从 `.txt` 文件的文件名中提取作者名字，并生成自定义词典文件 `custom_dict.txt`。词典文件格式为每行一个词，词后面是词频和词性标签。
+2. **加载自定义词典 (`load_custom_dict` 函数)**： 使用 `jieba.load_userdict` 加载自定义词典文件。这样，在分词时可以识别出自定义词典中的词语。
+3. **定义索引 Schema**： 使用 Whoosh 的 `Schema` 定义需要索引的字段，包括小说类型、名称、章节号、章节名和章节 URL。
+4. **创建或打开索引目录**： 检查索引目录是否存在。如果不存在则创建新的索引目录；如果存在则打开已有索引目录。
+5. **构建索引**： 从数据库中读取 NovelChapter 表中的所有章节数据，使用 Whoosh 的 writer 对象将数据逐条写入索引。在写入过程中，记录处理进度并输出日志。
+6. **提交索引**： 将写入的索引数据提交保存，确保所有数据都已正确写入索引库。
+
+##### 1.4 索引构建截图
+
+![image-20240605134652858](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605134652858.png)
+
+##### 1.5自定义词典展示
+
+![image-20240605134611953](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605134611953.png)
+
+
+
+## 四、搜索与推荐模块
+
+在该模块中，首先加载自定义词典，以增强对小说作者姓名的分词效果。接下来，打开已构建的索引，并创建一个多字段查询解析器，用于解析用户输入的搜索关键词。然后，使用BM25F算法进行搜索，以确保结果的相关性。搜索结果将高亮显示匹配的部分。
+
+为了推荐同类型和同作者的小说，首先统计搜索结果中前五个不同的小说类型和作者名。如果类型或作者数量不足五个，则使用第一个类型或作者补足推荐数量。推荐结果中确保小说名称不重复，以提供更丰富的阅读选择。
+
+### 1.步骤与代码实现
+
+#### 1.1加载自定义词典
+
+在搜索前加载自定义词典，以增强对作者名的分词效果。
+
+```py
+jieba.load_userdict('custom_dict.txt')
+```
+
+#### 1.2打开索引目录
+
+打开预先构建的Whoosh索引。
+
+```
+ix = open_dir("indexdir")
+```
+
+#### 1.3创建查询解析器并解析查询
+
+创建一个多字段查询解析器，并解析用户输入的搜索关键词。
+
+```python
+qp = MultifieldParser(["novel_type", "novel_name", "novel_author", "novel_chapter_num", "novel_chapter_name"], schema=ix.schema)
+q = qp.parse(query_str)
+```
+
+#### 1.4进行搜索并显示结果
+
+使用BM25F模型进行搜索，显示最匹配的前10条结果，并高亮显示匹配部分.
+
+```python
+with ix.searcher(weighting=scoring.BM25F()) as s:
+    results = s.search(q, limit=10)
+    for result in results:
+        # 高亮显示
+        novel_type = highlight_text(result.highlights("novel_type") or result["novel_type"])
+        # 打印结果
+        print(f"小说类型: {novel_type}")
+```
+
+#### 1.5推荐同类型和同作者的小说
+
+统计前五个不同的小说类型和作者名，分别进行推荐。
+
+```python
+# 统计小说类型和作者名
+novel_types = []
+novel_authors = []
+seen_novels = set()
+for result in results:
+    if result["novel_type"] not in novel_types:
+        novel_types.append(result["novel_type"])
+    if result["novel_author"] not in novel_authors:
+        novel_authors.append(result["novel_author"])
+
+# 推荐同类型小说
+recommended_types = recommend_by_field(s, "novel_type", novel_types, 5, seen_novels, ix)
+
+# 推荐同作者小说
+recommended_authors = recommend_by_field(s, "novel_author", novel_authors, 5, seen_novels, ix)
+```
+
+#### 1.6函数定义
+
+定义辅助函数，用于添加推荐的小说，并确保推荐的小说名称不重复。
+
+```py
+def add_recommendations(searcher, field, value, recommendations, unique_recommendations, seen_novels, ix, needed):
+    qp = MultifieldParser([field], schema=ix.schema)
+    q = qp.parse(value)
+    results = searcher.search(q, limit=needed * 2)
+    for result in results:
+        novel_info = {
+            "小说类型": result["novel_type"],
+            "小说名称": result["novel_name"],
+            "作者": result["novel_author"],
+            "章节号": result["novel_chapter_num"],
+            "章节名": result["novel_chapter_name"],
+            "章节URL": result["novel_chapter_url"]
+        }
+        if novel_info["小说名称"] not in unique_recommendations and novel_info["小说名称"] not in seen_novels:
+            unique_recommendations.add(novel_info["小说名称"])
+            recommendations.append(novel_info)
+        if len(recommendations) >= needed:
+            break
+```
+
+
+
+### 2.搜索结果展示
+
+#### 2.1控制台输出
+
+```shell
+C:\Users\21811\AppData\Local\Programs\Python\Python310\python.exe D:\course\SearchEngine\Book_SearchEngine\search.py 
+请输入搜索关键词: 飞鸟
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\21811\AppData\Local\Temp\jieba.cache
+Loading model cost 0.513 seconds.
+Prefix dict has been built successfully.
+最匹配的搜索结果[共12条相关记录，显示匹配度最高的前10条]:
+小说类型: 完本小说
+小说名称: 极品狂医
+作者: 二两馒头
+章节号: 第6638章
+章节名: 飞鸟
+章节URL: https://www.xbiqugew.com/book/45533/40586638.html
+==================================================
+小说类型: 玄幻小说
+小说名称: 雷武
+作者: 中下马笃
+章节号: 第四百九十一章
+章节名: 飞鸟
+章节URL: https://www.xbiqugew.com/book/221/27194015.html
+==================================================
+小说类型: 历史小说
+小说名称: 花豹突击队
+作者: 竹香书屋
+章节号: 第四千一百八十三章
+章节名: 山间飞鸟
+章节URL: https://www.xbiqugew.com/book/560/28476955.html
+==================================================
+小说类型: 完本小说
+小说名称: 极品狂医
+作者: 二两馒头
+章节号: 第6629章
+章节名: 飞鸟袭击
+章节URL: https://www.xbiqugew.com/book/45533/40585550.html
+==================================================
+小说类型: 玄幻小说
+小说名称: 惊天剑帝
+作者: 帝剑一
+章节号: 第906章
+章节名: 飞鸟传信
+章节URL: https://www.xbiqugew.com/book/30752/21629965.html
+==================================================
+小说类型: 玄幻小说
+小说名称: 惊天剑帝
+作者: 帝剑一
+章节号: 第4015章
+章节名: 飞鸟难遁
+章节URL: https://www.xbiqugew.com/book/30752/35398621.html
+==================================================
+小说类型: 历史小说
+小说名称: 天唐锦绣
+作者: 公子許
+章节号: 第一千八百一十一章
+章节名: 挥师飞鸟京
+章节URL: https://www.xbiqugew.com/book/8614/28459448.html
+==================================================
+小说类型: 历史小说
+小说名称: 最强终极兵王
+作者: 夜星下
+章节号: 第1212章
+章节名: 1209：漫天飞鸟
+章节URL: https://www.xbiqugew.com/book/27334/24113621.html
+==================================================
+小说类型: 完本小说
+小说名称: 贴身狂医
+作者: 六月添狗
+章节号: 第六百零六章
+章节名: 飞鸟镇瘟疫
+章节URL: https://www.xbiqugew.com/book/55894/40817612.html
+==================================================
+小说类型: 科幻小说
+小说名称: 踏星
+作者: 随散飘风
+章节号: 第四千三百六十八章
+章节名: 飞鸟为王
+章节URL: https://www.xbiqugew.com/book/31028/40080582.html
+==================================================
+----------------------------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------*****推荐阅读*****------------------------------------------------------------------
+小说类型: 完本小说
+小说名称: 1627崛起南海
+作者: 零点浪漫
+章节号: 1.第1章
+章节名: 那一扇上天打开的门
+章节URL: https://www.xbiqugew.com/book/6550/4280211.html
+==================================================
+小说类型: 玄幻小说
+小说名称: 万古天帝
+作者: 第一神
+章节号: 第四千八百三十二章
+章节名: 背后势力逆元黑根！
+章节URL: https://www.xbiqugew.com/book/1795/40818519.html
+==================================================
+小说类型: 历史小说
+小说名称: NBA：开局一张三分体验卡
+作者: 一江秋月
+章节号: 第1章
+章节名: 开局一张三分体验卡
+章节URL: https://www.xbiqugew.com/book/53086/39136926.html
+==================================================
+小说类型: 科幻小说
+小说名称: 三国神话世界
+作者: 永牧
+章节号: 第二千三百一十五章
+章节名: 博弈（上）
+章节URL: https://www.xbiqugew.com/book/54625/40796060.html
+==================================================
+
+进程已结束，退出代码为 0
+
+```
+
+#### 2.2截图
+
+![image-20240605165741765](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605165741765.png)
+
+![image-20240605165749122](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605165749122.png)
