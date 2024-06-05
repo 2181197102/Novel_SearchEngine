@@ -32,7 +32,7 @@ def load_custom_dict():
 schema = Schema(
     novel_type=TEXT(stored=True, analyzer=analyzer),
     novel_name=TEXT(stored=True, analyzer=analyzer),
-    novel_author=TEXT(stored=True, analyzer=analyzer),  # 添加作者字段
+    novel_author=TEXT(stored=True, analyzer=analyzer),
     novel_chapter_num=TEXT(stored=True, analyzer=analyzer),
     novel_chapter_name=TEXT(stored=True, analyzer=analyzer),
     novel_chapter_url=ID(stored=True, unique=True)
@@ -61,7 +61,7 @@ def build_index():
             writer.add_document(
                 novel_type=chapter.novel_type,
                 novel_name=chapter.novel_name,
-                novel_author=chapter.novel_author,  # 添加作者字段
+                novel_author=chapter.novel_author,
                 novel_chapter_num=chapter.novel_chapter_num,
                 novel_chapter_name=chapter.novel_chapter_name,
                 novel_chapter_url=chapter.novel_chapter_url
