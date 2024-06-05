@@ -1,12 +1,22 @@
 
-
 START_URL = "https://www.xbiquge.bz"
 
 
 HOST = "https://www.xbiquge.bz"
 
 # 爬取内容的存放目录
-BASE_DIR = r"D:\course\Distributed_crawler\crawl_book - turn_pages\book\\"
+BASE_DIR = r"D:\course\Distributed_crawler\crawl_book - turn_pages\book_with_author\\"
+
+# 添加数据库配置
+DATABASE = {
+    'name': 'book_search_engine',
+    'engine': 'peewee.MySQLDatabase',
+    'user': 'root',
+    'password': 'root123',
+    'host': '122.207.103.159',  # local_database_host 192.168.186.140  # csu_database_host 122.207.103.159
+    'port': 13306,              # local_database_port 3306  # csu_database_port 13306
+}
+
 
 # 'User-Agent'
 UA = [

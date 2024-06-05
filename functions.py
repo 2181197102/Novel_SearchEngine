@@ -1,6 +1,7 @@
 import os
 import re
 import random
+import time
 from urllib.request import Request, urlopen
 from lxml import etree
 import threading
@@ -11,7 +12,7 @@ def is_url_visited(url, visited_urls):
     return url in visited_urls
 
 # 获取网页内容
-def get_page(url):
+def get_page(url, retries=3):
     # 构造请求对象，设置User-Agent头部信息
     req = Request(url)
     req.add_header('User-Agent', random.choice(UA))
@@ -22,9 +23,13 @@ def get_page(url):
             page = response.read().decode('gbk', 'ignore')
         return page
     except Exception as e:
-        # 打印错误信息并返回错误标记
-        print(f"获取页面时出错: {e}")
-        return "error"
+        if retries > 0:
+            print(f"获取页面时出错: {e}, 重试中... ({retries})")
+            time.sleep(random.uniform(1, 3))  # 添加随机延时
+            return get_page(url, retries - 1)
+        else:
+            print(f"获取页面失败: {e}")
+            return "error"
 
 # 爬取具体内容页面
 def crawl_source_page(url, filedir, filename, visited_urls):
@@ -43,7 +48,7 @@ def crawl_source_page(url, filedir, filename, visited_urls):
     source_file_path = os.path.join(filedir, f"{filename}.txt")
 
     # 打开文件并写入内容
-    with open(source_file_path, 'w') as f:
+    with open(source_file_path, 'w', encoding='utf-8') as f:
         print(f"{source_file_path} 打开成功!")
         # 遍历节点列表，提取链接和文本内容，并写入文件
         for node in nodes:
@@ -70,33 +75,39 @@ def crawl_list_page(index_url, filedir, visited_urls):
     # 使用lxml解析页面内容
     tree = etree.HTML(page)
     # 使用XPath定位需要提取的节点
-    nodes = tree.xpath("//div[@id='newscontent']//div//ul//li//span[@class='s2']//a")
+    nodes = tree.xpath("//div[@id='newscontent']//div//ul//li")
 
     # 遍历节点列表
     for node in nodes:
-        # 获取节点中的链接
-        url = node.xpath("@href")[0]
-        print(f"book_content_url: {url}")
+        # 获取节点中的链接和文本内容
+        book_url = node.xpath(".//span[@class='s2']//a/@href")[0]
+        book_name = node.xpath(".//span[@class='s2']//a/text()")[0]
+        author_name = node.xpath(".//span[@class='s4']/text()")[0]
+        print(f"book_content_url: {book_url}")
+
+        # 拼接文件名
+        filename = f"{book_name}_{author_name}".replace("/", "_").replace("\\", "_")
 
         # 如果链接以https开头
-        if re.match(r'^https://', url):
+        if re.match(r'^https://', book_url):
             # 如果已经访问过，则跳过
-            if is_url_visited(url, visited_urls):
+            if is_url_visited(book_url, visited_urls):
                 pass
             else:
-                # 否则，提取链接中的文本，并调用crawl_source_page函数处理
-                filename = re.sub(r'[\\/:*?"<>|]', ' ', node.xpath("text()")[0])
-                crawl_source_page(url, filedir, filename, visited_urls)
+                # 调用crawl_source_page函数处理
+                crawl_source_page(book_url, filedir, filename, visited_urls)
+                time.sleep(random.uniform(1, 3))  # 添加随机延时
         else:
             # 如果链接不是以https开头，则进行进一步嵌套以进行分页
-            print(f"进一步嵌套以进行分页: {url}")
+            print(f"进一步嵌套以进行分页: {book_url}")
             index = index_url.rfind("/")
             base_url = index_url[:index + 1]
-            page_url = base_url + url
+            page_url = base_url + book_url
             # 如果未访问过，则递归调用crawl_list_page函数处理
             if not is_url_visited(page_url, visited_urls):
                 print(f"进一步嵌套以进行分页: {page_url}")
                 crawl_list_page(page_url, filedir, visited_urls)
+                time.sleep(random.uniform(1, 3))  # 添加随机延时
 
 # 爬取主页
 def crawl_index_page(start_url):
