@@ -39,16 +39,16 @@ def search_and_recommend(query_str, limit=10, offset=0):
     ])
 
     with ix.searcher(weighting=scoring.BM25F()) as s:
-        results = s.search(weighted_query, limit=limit+offset)
+        results = s.search(weighted_query, limit=limit + offset)
         if len(results) == 0:
-            return {"results": [], "recommendations": []}
+            return {"results": [], "recommendations": [], "total": 0}
 
         search_results = []
         novel_types = []
         novel_authors = []
         seen_novels = set()
 
-        for result in results[offset:offset+limit]:
+        for result in results[offset:offset + limit]:
             search_results.append({
                 "novel_type": highlight_text(result.highlights("novel_type") or result["novel_type"]),
                 "novel_name": highlight_text(result.highlights("novel_name") or result["novel_name"]),
@@ -73,7 +73,8 @@ def search_and_recommend(query_str, limit=10, offset=0):
         random.shuffle(recommendations)
         return {
             "results": search_results,
-            "recommendations": random.sample(recommendations, 5) if len(recommendations) >= 5 else recommendations
+            "recommendations": random.sample(recommendations, 5) if len(recommendations) >= 5 else recommendations,
+            "total": len(results)
         }
 
 def recommend_by_field(searcher, field, values, seen_novels, ix):
@@ -113,7 +114,7 @@ def index():
         # 记录用户搜索查询
         logging.info(f"User searched for: {query}")
         return render_template("index.html", query=query, results=search_results["results"],
-                               recommendations=search_results["recommendations"])
+                               recommendations=search_results["recommendations"], total=search_results["total"])
     return render_template("index.html")
 
 @app.route("/load_more", methods=["GET"])

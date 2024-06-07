@@ -92,6 +92,14 @@
         .result a:hover, .recommendation a:hover {
             text-decoration: underline;
         }
+        .total-results {
+            color: gray;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            color: gray;
+        }
     </style>
 </head>
 <body>
@@ -108,7 +116,7 @@
             {% if results or recommendations %}
             <div class="results-container">
                 <div class="left" id="results">
-                    <h2>搜索结果</h2>
+                    <h2>搜索结果 <span class="total-results">(共{{ total }}条结果)</span></h2>
                     {% if results %}
                         {% for result in results %}
                         <div class="result">
@@ -143,6 +151,7 @@
                 </div>
             </div>
             {% endif %}
+            <div id="loading">加载中...</div>
         </div>
     </div>
 
@@ -150,6 +159,7 @@
         let offset = 10;
         const query = "{{ query }}";
         const resultsContainer = document.getElementById('results');
+        const loadingIndicator = document.getElementById('loading');
 
         window.addEventListener('scroll', () => {
             if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
@@ -158,6 +168,7 @@
         });
 
         function loadMoreResults() {
+            loadingIndicator.style.display = 'block';
             fetch(`/load_more?query=${query}&offset=${offset}`)
                 .then(response => response.json())
                 .then(data => {
@@ -175,8 +186,12 @@
                         resultsContainer.appendChild(resultDiv);
                     });
                     offset += 10;
+                    loadingIndicator.style.display = 'none';
                 })
-                .catch(error => console.error('Error loading more results:', error));
+                .catch(error => {
+                    console.error('Error loading more results:', error);
+                    loadingIndicator.style.display = 'none';
+                });
         }
     </script>
 </body>
