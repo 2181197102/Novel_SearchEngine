@@ -16,20 +16,45 @@
 
 ### 1. 项目目录结构
 
-```
-
+```markdown
 Book_SearchEngine/
 ├── book_with_author/      # 保存爬取的小说内容
+├── craw_main.py           # 爬虫入口程序
 ├── functions.py           # 爬虫核心功能模块
 ├── import_files.py        # 数据导入模块
 ├── indexer.py             # 索引构建模块
-├── craw_main.py           # 爬虫入口程序
 ├── models.py              # 数据库模型
-├── search.py              # 搜索和推荐模块
+├── search.py              # 搜索和推荐模块 (已删除，被迭代为app.py前端网页。对应“四、搜索与推荐模块”，仅作为记录。)
+├── app.py                 # Flask 应用
+├── templates/             # 模板目录
+│   └── index.html         # 前端模板
 ├── settings.py            # 配置文件
 └── README.md              # 项目说明
+```
+
+**执行顺序以及调用关系：**
 
 ```
+craw_main.py -----调用-----> functions.py
+   | 
+   | 请等待爬虫程序完成
+   | 
+   v
+import_files.py -----调用-----> models.py
+   |                               
+   | 请等待导入数据库程序完成		 
+   |                               
+   v                               	
+indexer.py ----------调用---------- models.py --------生成-------> custom_dict.txt(自定义词典) & indexdir(索引文件)
+   | 
+   | 请等待构建倒排序索引程序完成
+   | 
+   v
+ app.py	-----调用-----> indexer.py & templates/index.html --------生成-------> 页面 http://127.0.0.1:5000
+ 
+```
+
+
 
 #### 2. 模块功能概述
 
@@ -931,3 +956,394 @@ Prefix dict has been built successfully.
 ![image-20240605165741765](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605165741765.png)
 
 ![image-20240605165749122](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605165749122.png)
+
+
+
+## 五、前端及网页设计
+
+### 5.1 前端概述
+
+本实验的前端部分主要使用HTML和CSS来构建用户界面，并通过JavaScript实现动态数据加载和用户交互。我使用Flask框架来搭建Web应用，处理用户请求并返回相应的搜索结果和推荐内容。
+
+### 5.2 目录结构
+
+```
+plaintext复制代码Book_SearchEngine/
+├── app.py                 # Flask 应用
+├── templates/             # 模板目录
+    └── index.html         # 前端模板
+```
+
+### 5.3 前端页面设计
+
+#### 5.3.1 HTML 模板
+
+在`templates`目录下创建了`index.html`文件，用于构建用户界面。
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>小说搜索引擎</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .centered {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        .search-container {
+            width: 100%;
+        }
+        .search-form {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .search-box {
+            flex: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-right: none;
+            border-radius: 4px 0 0 4px;
+            box-sizing: border-box;
+        }
+        .search-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-left: none;
+            border-radius: 0 4px 4px 0;
+            background-color: #a0d468;
+            color: #fff;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: background-color 0.3s ease;
+        }
+        .search-button:hover {
+            background-color: #8cc152;
+        }
+        .results-container {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 0;
+        }
+        .left, .right {
+            width: 48%;
+            text-align: left;
+        }
+        .result {
+            background-color: #fff5e6;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #ffc107;
+        }
+        .recommendation {
+            background-color: #e9ecef;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .result p, .recommendation p {
+            margin: 5px 0;
+        }
+        .result a, .recommendation a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .result a:hover, .recommendation a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="centered">
+        <div class="container">
+            <div class="search-container">
+                <h1>小说搜索引擎</h1>
+                <form method="post" class="search-form">
+                    <input type="text" name="query" class="search-box" placeholder="请输入搜索关键词" required value="{{ query }}">
+                    <button type="submit" class="search-button">搜索</button>
+                </form>
+            </div>
+            <!-- 搜索结果页面 -->
+            {% if results or recommendations %}
+            <div class="results-container">
+                <div class="left" id="results">
+                    <h2>搜索结果</h2>
+                    {% if results %}
+                        {% for result in results %}
+                        <div class="result">
+                            <p><strong>小说类型:</strong> {{ result.novel_type|safe }}</p>
+                            <p><strong>小说名称:</strong> {{ result.novel_name|safe }}</p>
+                            <p><strong>作者:</strong> {{ result.novel_author|safe }}</p>
+                            <p><strong>章节号:</strong> {{ result.novel_chapter_num|safe }}</p>
+                            <p><strong>章节名:</strong> {{ result.novel_chapter_name|safe }}</p>
+                            <p><strong>章节URL:</strong> <a href="{{ result.novel_chapter_url }}">{{ result.novel_chapter_url }}</a></p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <p>没有找到匹配的结果</p>
+                    {% endif %}
+                </div>
+                <div class="right">
+                    <h2>推荐阅读</h2>
+                    {% if recommendations %}
+                        {% for rec in recommendations %}
+                        <div class="recommendation">
+                            <p><strong>小说类型:</strong> {{ rec.novel_type }}</p>
+                            <p><strong>小说名称:</strong> {{ rec.novel_name }}</p>
+                            <p><strong>作者:</strong> {{ rec.novel_author }}</p>
+                            <p><strong>章节号:</strong> {{ rec.novel_chapter_num }}</p>
+                            <p><strong>章节名:</strong> {{ rec.novel_chapter_name }}</p>
+                            <p><strong>章节URL:</strong> <a href="{{ rec.novel_chapter_url }}">{{ rec.novel_chapter_url }}</a></p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <p>没有推荐结果</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        let offset = 10;
+        const query = "{{ query }}";
+        const resultsContainer = document.getElementById('results');
+
+        window.addEventListener('scroll', () => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
+                loadMoreResults();
+            }
+        });
+
+        function loadMoreResults() {
+            fetch(`/load_more?query=${query}&offset=${offset}`)
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(result => {
+                        const resultDiv = document.createElement('div');
+                        resultDiv.className = 'result';
+                        resultDiv.innerHTML = `
+                            <p><strong>小说类型:</strong> ${result.novel_type}</p>
+                            <p><strong>小说名称:</strong> ${result.novel_name}</p>
+                            <p><strong>作者:</strong> ${result.novel_author}</p>
+                            <p><strong>章节号:</strong> ${result.novel_chapter_num}</p>
+                            <p><strong>章节名:</strong> ${result.novel_chapter_name}</p>
+                            <p><strong>章节URL:</strong> <a href="${result.novel_chapter_url}">${result.novel_chapter_url}</a></p>
+                        `;
+                        resultsContainer.appendChild(resultDiv);
+                    });
+                    offset += 10;
+                })
+                .catch(error => console.error('Error loading more results:', error));
+        }
+    </script>
+</body>
+</html>
+```
+
+#### 5.3.2 CSS 样式
+
+在HTML模板中使用内嵌CSS样式，为页面元素定义样式，包括搜索框、搜索按钮、搜索结果和推荐阅读区域等。
+
+#### 5.3.3 JavaScript 实现动态加载
+
+使用JavaScript实现无限滚动加载更多搜索结果的功能。
+
+#### 5.3.4 触底反馈
+
+用户滚动到底部加载更多结果时，将显示“加载中...”提示，数据加载完成后自动隐藏。
+
+1. **加载指示器**：在HTML模板中添加一个`<div>`元素，用于显示加载中的状态。
+
+   ```
+   html
+   复制代码
+   <div id="loading">加载中...</div>
+   ```
+
+2. **JavaScript中控制加载指示器的显示和隐藏**：
+
+   - 当触底时，显示加载指示器。
+   - 数据加载完成后，隐藏加载指示器。
+
+   ```javascript
+   const loadingIndicator = document.getElementById('loading');
+   
+   function loadMoreResults() {
+       loadingIndicator.style.display = 'block';
+       fetch(`/load_more?query=${query}&offset=${offset}`)
+           .then(response => response.json())
+           .then(data => {
+               data.forEach(result => {
+                   const resultDiv = document.createElement('div');
+                   resultDiv.className = 'result';
+                   resultDiv.innerHTML = `
+                       <p><strong>小说类型:</strong> ${result.novel_type}</p>
+                       <p><strong>小说名称:</strong> ${result.novel_name}</p>
+                       <p><strong>作者:</strong> ${result.novel_author}</p>
+                       <p><strong>章节号:</strong> ${result.novel_chapter_num}</p>
+                       <p><strong>章节名:</strong> ${result.novel_chapter_name}</p>
+                       <p><strong>章节URL:</strong> <a href="${result.novel_chapter_url}">${result.novel_chapter_url}</a></p>
+                   `;
+                   resultsContainer.appendChild(resultDiv);
+               });
+               offset += 10;
+               loadingIndicator.style.display = 'none';
+           })
+           .catch(error => {
+               console.error('Error loading more results:', error);
+               loadingIndicator.style.display = 'none';
+           });
+   }
+   ```
+
+
+
+### 5.4 后端处理逻辑
+
+后端使用Flask框架来处理用户请求，搜索和推荐逻辑如下：
+
+#### 5.4.1 配置日志系统
+
+在`app.py`中配置日志系统以记录用户的搜索查询。
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', handlers=[logging.FileHandler("search_logs.log"), logging.StreamHandler()])
+```
+
+#### 5.4.2 搜索与推荐逻辑
+
+使用Whoosh进行全文搜索，并根据关键词返回搜索结果和推荐内容。
+
+```python
+from flask import Flask, request, render_template, jsonify
+from whoosh.index import open_dir
+from whoosh.qparser import MultifieldParser, OrGroup
+from whoosh.query import Term, Or
+from whoosh import scoring
+import jieba
+
+app = Flask(__name__)
+
+def search_and_recommend(query_str, limit=10, offset=0):
+    jieba.load_userdict('custom_dict.txt')
+    ix = open_dir("indexdir")
+    qp = MultifieldParser(
+        ["novel_type", "novel_name", "novel_author", "novel_chapter_num", "novel_chapter_name"],
+        schema=ix.schema,
+        group=OrGroup
+    )
+
+    q = qp.parse(query_str)
+
+    weighted_query = Or([
+        Term("novel_name", query_str, boost=300),
+        Term("novel_author", query_str, boost=250),
+        Term("novel_chapter_name", query_str, boost=145)
+    ])
+
+    with ix.searcher(weighting=scoring.BM25F()) as s:
+        results = s.search(weighted_query, limit=limit+offset)
+        if len(results) == 0:
+            return {"results": [], "recommendations": []}
+
+        search_results = []
+        novel_types = []
+        novel_authors = []
+        seen_novels = set()
+
+        for result in results[offset:offset+limit]:
+            search_results.append({
+                "novel_type": result["novel_type"],
+                "novel_name": result["novel_name"],
+                "novel_author": result["novel_author"],
+                "novel_chapter_num": result["novel_chapter_num"],
+                "novel_chapter_name": result["novel_chapter_name"],
+                "novel_chapter_url": result["novel_chapter_url"]
+            })
+            seen_novels.add(result["novel_name"])
+            if result["novel_type"] not in novel_types:
+                novel_types.append(result["novel_type"])
+            if result["novel_author"] not in novel_authors:
+                novel_authors.append(result["novel_author"])
+
+            if len(novel_types) >= 5 and len(novel_authors) >= 5:
+                break
+
+        recommended_types = recommend_by_field(s, "novel_type", novel_types, seen_novels, ix)
+        recommended_authors = recommend_by_field(s, "novel_author", novel_authors, seen_novels, ix)
+
+        recommendations = recommended_types + recommended_authors
+        random.shuffle(recommendations)
+        return {
+            "results": search_results,
+            "recommendations": random.sample(recommendations, 5) if len(recommendations) >= 5 else recommendations
+        }
+```
+
+#### 5.4.3 处理无限滚动加载更多结果
+
+在`app.py`中添加处理无限滚动加载更多结果的路由。
+
+```python
+@app.route("/load_more", methods=["GET"])
+def load_more():
+    query = request.args.get("query")
+    offset = int(request.args.get("offset"))
+    search_results = search_and_recommend(query, limit=10, offset=offset)
+    return jsonify(search_results["results"])
+```
+
+#### 5.4.4 统计结果数量并在前端显示
+
+```py
+        if len(results) == 0:
+            return {"results": [], "recommendations": [], "total": 0}
+```
+
+
+
+## 六、前端界面展示
+
+**主页：**
+
+![image-20240608021319191](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240608021319191.png)
+
+**详情页：**
+
+![image-20240608022128544](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240608022128544.png)
+
+**触底动态加载动画：**
+
+![image-20240608022839752](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240608022839752.png)
+
+**日志记录：**
+
+![image-20240608022948413](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240608022948413.png)
