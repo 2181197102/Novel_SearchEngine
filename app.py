@@ -1,4 +1,5 @@
 import random
+import logging
 from flask import Flask, request, render_template, jsonify
 from whoosh.index import open_dir
 from whoosh.qparser import MultifieldParser, OrGroup
@@ -7,6 +8,9 @@ from whoosh import scoring
 import jieba
 
 app = Flask(__name__)
+
+# 配置日志系统
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', handlers=[logging.FileHandler("search_logs.log"), logging.StreamHandler()])
 
 # ANSI 转义码颜色
 HIGHLIGHT_COLOR = "<span style='color:red'>"
@@ -106,6 +110,8 @@ def index():
     if request.method == "POST":
         query = request.form["query"]
         search_results = search_and_recommend(query)
+        # 记录用户搜索查询
+        logging.info(f"User searched for: {query}")
         return render_template("index.html", query=query, results=search_results["results"],
                                recommendations=search_results["recommendations"])
     return render_template("index.html")
