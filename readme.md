@@ -183,15 +183,15 @@ indexer.py ----------调用---------- models.py --------生成-------> custom_di
 
 小说类别作为文件名：
 
-![image-20240605123924733](images\image-20240605123924733.png)
+![image-20240605123924733](images/image-20240605123924733.png)
 
 小说名与小说作者拼接作为.txt文件名称（格式为：小说名_作者）：
 
-![image-20240605123947457](images\image-20240605123947457.png)
+![image-20240605123947457](images/image-20240605123947457.png)
 
 .txt文件内部存储整本小说的所有章节、章节名、章节url：
 
-![image-20240605124046121](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605124046121.png)
+![image-20240605124046121](images/image-20240605124046121.png)
 
 
 
@@ -203,7 +203,7 @@ indexer.py ----------调用---------- models.py --------生成-------> custom_di
 
 > ./settings.py  UA
 
-![image-20240605124406262](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605124406262.png)
+![image-20240605124406262](images/image-20240605124406262.png)
 
 
 
@@ -226,7 +226,7 @@ indexer.py ----------调用---------- models.py --------生成-------> custom_di
             return "error"
 ```
 
-![image-20240605131540994](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605131540994.png)
+![image-20240605131540994](images/image-20240605131540994.png)
 
 
 
@@ -251,7 +251,7 @@ class MyThread(threading.Thread):
 
 ### 4.爬取过程控制台输出截图
 
-![image-20240605131639785](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605131639785.png)
+![image-20240605131639785](images/image-20240605131639785.png)
 
 
 
@@ -279,37 +279,6 @@ class MyThread(threading.Thread):
 - `novel_chapter_name`：章节名
 - `novel_chapter_url`：章节的 URL
 
-**models.py**：
-
-```py
-python复制代码from peewee import Model, CharField, MySQLDatabase
-from settings import DATABASE
-
-# 连接到 MySQL 数据库
-db = MySQLDatabase(
-    DATABASE['name'],
-    user=DATABASE['user'],
-    password=DATABASE['password'],
-    host=DATABASE['host'],
-    port=DATABASE['port']
-)
-
-# 定义 NovelChapter 模型来存储小说章节数据
-class NovelChapter(Model):
-    novel_type = CharField()  # 小说类型
-    novel_name = CharField()  # 小说名称
-    novel_author = CharField()  # 小说作者
-    novel_chapter_num = CharField()  # 章节号
-    novel_chapter_name = CharField()  # 章节名
-    novel_chapter_url = CharField()  # 章节的URL
-
-    class Meta:
-        database = db  # 绑定到 MySQL 数据库
-
-# 连接到数据库并创建表
-db.connect()
-db.create_tables([NovelChapter])
-```
 
 ### 3. 数据处理与导入实现
 
@@ -318,61 +287,11 @@ db.create_tables([NovelChapter])
 **import_files.py**：
 
 ```py
-import os
-import chardet
-from models import NovelChapter
-
 # 检测文件编码
 def detect_encoding(file_path):
-    with open(file_path, 'rb') as f:
-        raw_data = f.read()
-    result = chardet.detect(raw_data)
-    return result['encoding']
 
 # 导入文件数据
 def import_files(directory):
-    for root, dirs, files in os.walk(directory):
-        for dir_name in dirs:
-            novel_type = dir_name  # 小说类型是文件夹名称
-            dir_path = os.path.join(root, dir_name)
-            for novel_file in os.listdir(dir_path):
-                if novel_file.endswith('.txt'):
-                    # 从文件名中提取小说名和作者名
-                    novel_info = os.path.splitext(novel_file)[0].split('_')
-                    if len(novel_info) == 2:
-                        novel_name, novel_author = novel_info
-                    else:
-                        novel_name = novel_info[0]
-                        novel_author = '未知'
-
-                    file_path = os.path.join(dir_path, novel_file)
-                    encoding = detect_encoding(file_path)  # 检测文件编码
-                    try:
-                        with open(file_path, 'r', encoding=encoding, errors='ignore') as f:
-                            lines = f.readlines()
-                            for line in lines:
-                                parts = line.strip().split(': ')
-                                if len(parts) == 2:
-                                    chapter_info = parts[0].split(' ')
-                                    if len(chapter_info) == 2:
-                                        novel_chapter_num = chapter_info[0]
-                                        novel_chapter_name = chapter_info[1]
-                                        novel_chapter_url = parts[1]
-                                        try:
-                                            # 将数据保存到数据库
-                                            NovelChapter.create(
-                                                novel_type=novel_type,
-                                                novel_name=novel_name,
-                                                novel_author=novel_author,
-                                                novel_chapter_num=novel_chapter_num,
-                                                novel_chapter_name=novel_chapter_name,
-                                                novel_chapter_url=novel_chapter_url
-                                            )
-                                            print(f"已导入: {novel_name} - {novel_chapter_num} {novel_chapter_name}")
-                                        except Exception as e:
-                                            print(f"导入时出错: {novel_name} - {novel_chapter_num} {novel_chapter_name} - {e}")
-                    except UnicodeDecodeError as e:
-                        print(f"文件解码错误: {file_path} - {e}")
 
 if __name__ == "__main__":
     import_files('D:\\course\\Distributed_crawler\\crawl_book - turn_pages\\book_with_author')  # 使用实际的小说文件目录
@@ -382,13 +301,13 @@ if __name__ == "__main__":
 
 ### 4.数据处理以及导入过程控制台截图
 
-![image-20240605131758271](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605131758271.png)
+![image-20240605131758271](images/image-20240605131758271.png)
 
 
 
 ### 5.数据库数据展示
 
-![image-20240605130904448](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605130904448.png)
+![image-20240605130904448](images/image-20240605130904448.png)
 
 
 
@@ -466,31 +385,11 @@ if __name__ == "__main__":
 以下是更新后的索引构建模块代码：
 
 ```py
-import jieba
-from whoosh.index import create_in, open_dir
-from whoosh.fields import Schema, TEXT, ID
-from jieba.analyse import ChineseAnalyzer
-import os
-from models import NovelChapter
-
 # 使用 jieba 分词器进行中文分词
 analyzer = ChineseAnalyzer()
 
 # 生成自定义词典文件
 def generate_custom_dict(directory):
-    authors = set()
-    for root, _, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.txt'):
-                # 从文件名中提取作者名字
-                novel_info = os.path.splitext(file)[0].split('_')
-                if len(novel_info) == 2:
-                    author = novel_info[1]
-                    authors.add(author)
-    # 写入自定义词典文件
-    with open('custom_dict.txt', 'w', encoding='utf-8') as f:
-        for author in authors:
-            f.write(f"{author} 1000 nr\n")
 
 # 加载自定义词典
 def load_custom_dict():
@@ -508,41 +407,9 @@ schema = Schema(
 
 # 创建索引目录
 index_dir = "indexdir"
-if not os.path.exists(index_dir):
-    os.mkdir(index_dir)
-    ix = create_in(index_dir, schema)
-else:
-    ix = open_dir(index_dir)
 
 # 构建索引的函数
 def build_index():
-    writer = ix.writer()
-    total_chapters = NovelChapter.select().count()
-    print(f"总章节数: {total_chapters}")
-    processed = 0
-    for chapter in NovelChapter.select():
-        try:
-            writer.add_document(
-                novel_type=chapter.novel_type,
-                novel_name=chapter.novel_name,
-                novel_author=chapter.novel_author,
-                novel_chapter_num=chapter.novel_chapter_num,
-                novel_chapter_name=chapter.novel_chapter_name,
-                novel_chapter_url=chapter.novel_chapter_url
-            )
-            processed += 1
-            if processed % 100 == 0:
-                print(f"已处理章节数: {processed}/{total_chapters}")
-        except Exception as e:
-            print(f"索引时出错: {chapter.novel_name} - {chapter.novel_chapter_num} {chapter.novel_chapter_name} - {e}")
-    writer.commit()
-
-if __name__ == "__main__":
-    # 使用实际的小说文件目录生成自定义词典
-    generate_custom_dict('D:\\course\\Distributed_crawler\\crawl_book - turn_pages\\book_with_author')
-    load_custom_dict()  # 加载自定义词典
-    build_index()  # 构建索引
-    print("索引构建完成")
 
 ```
 
@@ -557,11 +424,11 @@ if __name__ == "__main__":
 
 ##### 1.4 索引构建截图
 
-![image-20240605134652858](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605134652858.png)
+![image-20240605134652858](images/image-20240605134652858.png)
 
 ##### 1.5自定义词典展示
 
-![image-20240605134611953](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605134611953.png)
+![image-20240605134611953](images/image-20240605134611953.png)
 
 
 
@@ -780,9 +647,9 @@ Prefix dict has been built successfully.
 
 #### 2.2截图
 
-![image-20240605165741765](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605165741765.png)
+![image-20240605165741765](images/image-20240605165741765.png)
 
-![image-20240605165749122](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240605165749122.png)
+![image-20240605165749122](images/image-20240605165749122.png)
 
 
 
@@ -807,192 +674,6 @@ plaintext复制代码Book_SearchEngine/
 
 在`templates`目录下创建了`index.html`文件，用于构建用户界面。
 
-```html
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>小说搜索引擎</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            width: 80%;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .centered {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            text-align: center;
-        }
-        .search-container {
-            width: 100%;
-        }
-        .search-form {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-        .search-box {
-            flex: 1;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-right: none;
-            border-radius: 4px 0 0 4px;
-            box-sizing: border-box;
-        }
-        .search-button {
-            padding: 10px 20px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-left: none;
-            border-radius: 0 4px 4px 0;
-            background-color: #a0d468;
-            color: #fff;
-            cursor: pointer;
-            box-sizing: border-box;
-            transition: background-color 0.3s ease;
-        }
-        .search-button:hover {
-            background-color: #8cc152;
-        }
-        .results-container {
-            display: flex;
-            justify-content: space-between;
-            padding: 20px 0;
-        }
-        .left, .right {
-            width: 48%;
-            text-align: left;
-        }
-        .result {
-            background-color: #fff5e6;
-            margin-bottom: 20px;
-            padding: 15px;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            border-left: 5px solid #ffc107;
-        }
-        .recommendation {
-            background-color: #e9ecef;
-            margin-bottom: 20px;
-            padding: 15px;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        .result p, .recommendation p {
-            margin: 5px 0;
-        }
-        .result a, .recommendation a {
-            color: #007bff;
-            text-decoration: none;
-        }
-        .result a:hover, .recommendation a:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-    <div class="centered">
-        <div class="container">
-            <div class="search-container">
-                <h1>小说搜索引擎</h1>
-                <form method="post" class="search-form">
-                    <input type="text" name="query" class="search-box" placeholder="请输入搜索关键词" required value="{{ query }}">
-                    <button type="submit" class="search-button">搜索</button>
-                </form>
-            </div>
-            <!-- 搜索结果页面 -->
-            {% if results or recommendations %}
-            <div class="results-container">
-                <div class="left" id="results">
-                    <h2>搜索结果</h2>
-                    {% if results %}
-                        {% for result in results %}
-                        <div class="result">
-                            <p><strong>小说类型:</strong> {{ result.novel_type|safe }}</p>
-                            <p><strong>小说名称:</strong> {{ result.novel_name|safe }}</p>
-                            <p><strong>作者:</strong> {{ result.novel_author|safe }}</p>
-                            <p><strong>章节号:</strong> {{ result.novel_chapter_num|safe }}</p>
-                            <p><strong>章节名:</strong> {{ result.novel_chapter_name|safe }}</p>
-                            <p><strong>章节URL:</strong> <a href="{{ result.novel_chapter_url }}">{{ result.novel_chapter_url }}</a></p>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                    <p>没有找到匹配的结果</p>
-                    {% endif %}
-                </div>
-                <div class="right">
-                    <h2>推荐阅读</h2>
-                    {% if recommendations %}
-                        {% for rec in recommendations %}
-                        <div class="recommendation">
-                            <p><strong>小说类型:</strong> {{ rec.novel_type }}</p>
-                            <p><strong>小说名称:</strong> {{ rec.novel_name }}</p>
-                            <p><strong>作者:</strong> {{ rec.novel_author }}</p>
-                            <p><strong>章节号:</strong> {{ rec.novel_chapter_num }}</p>
-                            <p><strong>章节名:</strong> {{ rec.novel_chapter_name }}</p>
-                            <p><strong>章节URL:</strong> <a href="{{ rec.novel_chapter_url }}">{{ rec.novel_chapter_url }}</a></p>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                    <p>没有推荐结果</p>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <script>
-        let offset = 10;
-        const query = "{{ query }}";
-        const resultsContainer = document.getElementById('results');
-
-        window.addEventListener('scroll', () => {
-            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
-                loadMoreResults();
-            }
-        });
-
-        function loadMoreResults() {
-            fetch(`/load_more?query=${query}&offset=${offset}`)
-                .then(response => response.json())
-                .then(data => {
-                    data.forEach(result => {
-                        const resultDiv = document.createElement('div');
-                        resultDiv.className = 'result';
-                        resultDiv.innerHTML = `
-                            <p><strong>小说类型:</strong> ${result.novel_type}</p>
-                            <p><strong>小说名称:</strong> ${result.novel_name}</p>
-                            <p><strong>作者:</strong> ${result.novel_author}</p>
-                            <p><strong>章节号:</strong> ${result.novel_chapter_num}</p>
-                            <p><strong>章节名:</strong> ${result.novel_chapter_name}</p>
-                            <p><strong>章节URL:</strong> <a href="${result.novel_chapter_url}">${result.novel_chapter_url}</a></p>
-                        `;
-                        resultsContainer.appendChild(resultDiv);
-                    });
-                    offset += 10;
-                })
-                .catch(error => console.error('Error loading more results:', error));
-        }
-    </script>
-</body>
-</html>
-```
-
 #### 5.3.2 CSS 样式
 
 在HTML模板中使用内嵌CSS样式，为页面元素定义样式，包括搜索框、搜索按钮、搜索结果和推荐阅读区域等。
@@ -1008,8 +689,6 @@ plaintext复制代码Book_SearchEngine/
 1. **加载指示器**：在HTML模板中添加一个`<div>`元素，用于显示加载中的状态。
 
    ```
-   html
-   复制代码
    <div id="loading">加载中...</div>
    ```
 
@@ -1017,37 +696,6 @@ plaintext复制代码Book_SearchEngine/
 
    - 当触底时，显示加载指示器。
    - 数据加载完成后，隐藏加载指示器。
-
-   ```javascript
-   const loadingIndicator = document.getElementById('loading');
-   
-   function loadMoreResults() {
-       loadingIndicator.style.display = 'block';
-       fetch(`/load_more?query=${query}&offset=${offset}`)
-           .then(response => response.json())
-           .then(data => {
-               data.forEach(result => {
-                   const resultDiv = document.createElement('div');
-                   resultDiv.className = 'result';
-                   resultDiv.innerHTML = `
-                       <p><strong>小说类型:</strong> ${result.novel_type}</p>
-                       <p><strong>小说名称:</strong> ${result.novel_name}</p>
-                       <p><strong>作者:</strong> ${result.novel_author}</p>
-                       <p><strong>章节号:</strong> ${result.novel_chapter_num}</p>
-                       <p><strong>章节名:</strong> ${result.novel_chapter_name}</p>
-                       <p><strong>章节URL:</strong> <a href="${result.novel_chapter_url}">${result.novel_chapter_url}</a></p>
-                   `;
-                   resultsContainer.appendChild(resultDiv);
-               });
-               offset += 10;
-               loadingIndicator.style.display = 'none';
-           })
-           .catch(error => {
-               console.error('Error loading more results:', error);
-               loadingIndicator.style.display = 'none';
-           });
-   }
-   ```
 
 
 
@@ -1069,84 +717,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', hand
 
 使用Whoosh进行全文搜索，并根据关键词返回搜索结果和推荐内容。
 
-```python
-from flask import Flask, request, render_template, jsonify
-from whoosh.index import open_dir
-from whoosh.qparser import MultifieldParser, OrGroup
-from whoosh.query import Term, Or
-from whoosh import scoring
-import jieba
-
-app = Flask(__name__)
-
-def search_and_recommend(query_str, limit=10, offset=0):
-    jieba.load_userdict('custom_dict.txt')
-    ix = open_dir("indexdir")
-    qp = MultifieldParser(
-        ["novel_type", "novel_name", "novel_author", "novel_chapter_num", "novel_chapter_name"],
-        schema=ix.schema,
-        group=OrGroup
-    )
-
-    q = qp.parse(query_str)
-
-    weighted_query = Or([
-        Term("novel_name", query_str, boost=300),
-        Term("novel_author", query_str, boost=250),
-        Term("novel_chapter_name", query_str, boost=145)
-    ])
-
-    with ix.searcher(weighting=scoring.BM25F()) as s:
-        results = s.search(weighted_query, limit=limit+offset)
-        if len(results) == 0:
-            return {"results": [], "recommendations": []}
-
-        search_results = []
-        novel_types = []
-        novel_authors = []
-        seen_novels = set()
-
-        for result in results[offset:offset+limit]:
-            search_results.append({
-                "novel_type": result["novel_type"],
-                "novel_name": result["novel_name"],
-                "novel_author": result["novel_author"],
-                "novel_chapter_num": result["novel_chapter_num"],
-                "novel_chapter_name": result["novel_chapter_name"],
-                "novel_chapter_url": result["novel_chapter_url"]
-            })
-            seen_novels.add(result["novel_name"])
-            if result["novel_type"] not in novel_types:
-                novel_types.append(result["novel_type"])
-            if result["novel_author"] not in novel_authors:
-                novel_authors.append(result["novel_author"])
-
-            if len(novel_types) >= 5 and len(novel_authors) >= 5:
-                break
-
-        recommended_types = recommend_by_field(s, "novel_type", novel_types, seen_novels, ix)
-        recommended_authors = recommend_by_field(s, "novel_author", novel_authors, seen_novels, ix)
-
-        recommendations = recommended_types + recommended_authors
-        random.shuffle(recommendations)
-        return {
-            "results": search_results,
-            "recommendations": random.sample(recommendations, 5) if len(recommendations) >= 5 else recommendations
-        }
-```
 
 #### 5.4.3 处理无限滚动加载更多结果
 
 在`app.py`中添加处理无限滚动加载更多结果的路由。
 
-```python
-@app.route("/load_more", methods=["GET"])
-def load_more():
-    query = request.args.get("query")
-    offset = int(request.args.get("offset"))
-    search_results = search_and_recommend(query, limit=10, offset=offset)
-    return jsonify(search_results["results"])
-```
 
 #### 5.4.4 统计结果数量并在前端显示
 
@@ -1161,16 +736,16 @@ def load_more():
 
 **主页：**
 
-![image-20240608021319191](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240608021319191.png)
+![image-20240608021319191](images/image-20240608021319191.png)
 
 **详情页：**
 
-![image-20240608022128544](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240608022128544.png)
+![image-20240608022128544](images/image-20240608022128544.png)
 
 **触底动态加载动画：**
 
-![image-20240608022839752](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240608022839752.png)
+![image-20240608022839752](images/image-20240608022839752.png)
 
 **日志记录：**
 
-![image-20240608022948413](C:\Users\21811\AppData\Roaming\Typora\typora-user-images\image-20240608022948413.png)
+![image-20240608022948413](images/image-20240608022948413.png)
