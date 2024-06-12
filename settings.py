@@ -13,8 +13,8 @@ DATABASE = {
     'engine': 'peewee.MySQLDatabase',
     'user': 'root',
     'password': 'root123',
-    'host': '122.207.103.159',  # local_database_host 192.168.186.140  # csu_database_host 122.207.103.159
-    'port': 13306,              # local_database_port 3306  # csu_database_port 13306
+    'host': 'xxx.xxx.xxx.xxx', 
+    'port': xxxx, 
 }
 
 
